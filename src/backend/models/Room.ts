@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, model, models } from 'mongoose';
 export interface IRoom extends Document {
   roomCode: string;
   videoUrl: string;
+  videoType: 'YOUTUBE' | 'FILE';
   passcode?: string;
   playing: boolean;
   currentTime: number;
@@ -19,6 +20,11 @@ const RoomSchema = new Schema<IRoom>({
   videoUrl: { 
     type: String, 
     required: true 
+  },
+  videoType: {
+    type: String,
+    enum: ['YOUTUBE', 'FILE'],
+    required: true
   },
   passcode: { 
     type: String 

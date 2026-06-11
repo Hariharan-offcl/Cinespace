@@ -31,9 +31,14 @@ export const resolvers = {
           existingRoom = await Room.findOne({ roomCode });
         }
 
+        // Simple Detection: Check if URL is from YouTube
+        const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
+        const videoType = isYouTube ? 'YOUTUBE' : 'FILE';
+
         const newRoom = new Room({
           roomCode,
           videoUrl,
+          videoType,
           passcode,
           playing: false,
           currentTime: 0,

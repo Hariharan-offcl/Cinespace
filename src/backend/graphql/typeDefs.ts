@@ -5,6 +5,7 @@ export const typeDefs = gql`
     id: ID!
     roomCode: String!
     videoUrl: String!
+    videoType: String!
     playing: Boolean!
     currentTime: Float!
     createdAt: String!
