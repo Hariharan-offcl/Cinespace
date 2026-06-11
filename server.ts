@@ -37,12 +37,51 @@ app.prepare().then(() => {
   });
 
   // WebSocket Connection Logic
-  wss.on('connection', (ws, request) => {
+  wss.on('connection', (ws: any) => {
     console.log('New WebSocket connection established');
 
-    ws.on('message', (message) => {
-      console.log('Received message:', message.toString());
-      // Logic for broadcasting sync state will go here in the next step
+    ws.on('message', (data: string) => {
+      try {
+        const message = JSON.parse(data);
+        const { type, roomCode, payload } = message;
+
+        // 1. User joins a room
+        if (type === 'JOIN') {
+          ws.roomCode = roomCode;
+          console.log(`User joined room: ${roomCode}`);
+          
+          // If the room has an existing state (someone is already watching),
+          // send that state to the new user immediately.
+          if (rooms.has(roomCode)) {
+            ws.send(JSON.stringify({
+              type: 'SYNC_VIDEO',
+              payload: rooms.get(roomCode)
+            }));
+          }
+        }
+
+        // 2. User syncs video state (play/pause/seek)
+        if (type === 'SYNC_VIDEO' && ws.roomCode) {
+          // Update our local "Zero-cost Redis" cache
+          rooms.set(ws.roomCode, payload);
+
+          // Broadcast the update to EVERYONE ELSE in the same room
+          wss.clients.forEach((client: any) => {
+            if (
+              client !== ws && 
+              client.readyState === 1 && // 1 = OPEN
+              client.roomCode === ws.roomCode
+            ) {
+              client.send(JSON.stringify({
+                type: 'SYNC_VIDEO',
+                payload
+              }));
+            }
+          });
+        }
+      } catch (err) {
+        console.error('WebSocket message error:', err);
+      }
     });
 
     ws.on('close', () => {
