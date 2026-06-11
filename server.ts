@@ -79,6 +79,26 @@ app.prepare().then(() => {
             }
           });
         }
+
+        // 3. User sends a chat message
+        if (type === 'CHAT_MESSAGE' && ws.roomCode) {
+          // Broadcast the message to EVERYONE in the room (including the sender)
+          // so that the sender also gets a confirmation that it was sent.
+          wss.clients.forEach((client: any) => {
+            if (
+              client.readyState === 1 && // 1 = OPEN
+              client.roomCode === ws.roomCode
+            ) {
+              client.send(JSON.stringify({
+                type: 'CHAT_MESSAGE',
+                payload: {
+                  ...payload,
+                  timestamp: new Date().toISOString()
+                }
+              }));
+            }
+          });
+        }
       } catch (err) {
         console.error('WebSocket message error:', err);
       }
