@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
@@ -16,8 +17,11 @@ const rooms = new Map();
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url!, true);
-    handle(req, res, parsedUrl);
+    const parsedUrl = new URL(req.url!, `http://${hostname}:${port}`);
+    handle(req, res, {
+      pathname: parsedUrl.pathname,
+      query: Object.fromEntries(parsedUrl.searchParams)
+    } as any);
   });
 
   // Initialize WebSocket Server
@@ -25,24 +29,86 @@ app.prepare().then(() => {
 
   // Handle "Upgrade" requests (HTTP -> WebSocket)
   server.on('upgrade', (request, socket, head) => {
-    const { pathname } = parse(request.url!, true);
+    const parsedUrl = new URL(request.url!, `http://${hostname}:${port}`);
 
-    if (pathname === '/api/sync') {
+    if (parsedUrl.pathname === '/api/sync') {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
-    } else {
+    } else if (!parsedUrl.pathname.startsWith('/_next')) {
+      // Only destroy the socket if it's not our API AND not Next.js internal
       socket.destroy();
     }
+    // If it's a /_next/ path, we don't call socket.destroy(),
+    // allowing Next.js's own listeners to handle the HMR handshake.
   });
 
   // WebSocket Connection Logic
-  wss.on('connection', (ws, request) => {
+  wss.on('connection', (ws: any) => {
     console.log('New WebSocket connection established');
 
-    ws.on('message', (message) => {
-      console.log('Received message:', message.toString());
-      // Logic for broadcasting sync state will go here in the next step
+    ws.on('message', (data: string) => {
+      try {
+        const message = JSON.parse(data);
+        const { type, roomCode, payload } = message;
+
+        // 1. User joins a room
+        if (type === 'JOIN') {
+          ws.roomCode = roomCode;
+          console.log(`User joined room: ${roomCode}`);
+          
+          // If the room has an existing state (someone is already watching),
+          // send that state to the new user immediately.
+          if (rooms.has(roomCode)) {
+            ws.send(JSON.stringify({
+              type: 'SYNC_VIDEO',
+              payload: rooms.get(roomCode)
+            }));
+          }
+        }
+
+        // 2. User syncs video state (play/pause/seek)
+        if (type === 'SYNC_VIDEO' && ws.roomCode) {
+          // Update our local "Zero-cost Redis" cache
+          rooms.set(ws.roomCode, payload);
+
+          // Broadcast the update to EVERYONE ELSE in the same room
+          wss.clients.forEach((client: any) => {
+            if (
+              client !== ws && 
+              client.readyState === 1 && // 1 = OPEN
+              client.roomCode === ws.roomCode
+            ) {
+              client.send(JSON.stringify({
+                type: 'SYNC_VIDEO',
+                payload
+              }));
+            }
+          });
+        }
+
+        // 3. User sends a chat message
+        if (type === 'CHAT_MESSAGE' && ws.roomCode) {
+          // Broadcast the message to EVERYONE in the room (including the sender)
+          // so that the sender also gets a confirmation that it was sent.
+          wss.clients.forEach((client: any) => {
+            if (
+              client.readyState === 1 && // 1 = OPEN
+              client.roomCode === ws.roomCode
+            ) {
+              client.send(JSON.stringify({
+                type: 'CHAT_MESSAGE',
+                payload: {
+                  ...payload,
+                  timestamp: new Date().toISOString()
+                }
+              }));
+            }
+          });
+        }
+      } catch (err) {
+        console.error('WebSocket message error:', err);
+      }
     });
 
     ws.on('close', () => {

@@ -3,47 +3,56 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface SyncMessage {
-  type: 'SYNC' | 'CHAT';
-  action?: 'PLAY' | 'PAUSE' | 'SEEK';
-  time?: number;
-  sender?: string;
-  text?: string;
-  timestamp: number;
+  type: 'JOIN' | 'SYNC_VIDEO' | 'CHAT_MESSAGE';
+  roomCode?: string;
+  payload?: any;
+}
+
+interface ChatMessage {
+  sender: string;
+  text: string;
+  timestamp: string;
 }
 
 interface UseRoomSyncProps {
   roomCode: string;
   displayName: string;
-  onSyncReceived: (action: 'PLAY' | 'PAUSE' | 'SEEK', time: number, timestamp: number) => void;
+  onSyncReceived: (state: { playing: boolean; currentTime: number }) => void;
 }
 
 export function useRoomSync({ roomCode, displayName, onSyncReceived }: UseRoomSyncProps) {
   const socketRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [messages, setMessages] = useState<SyncMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     
-    const socket = new WebSocket(`${protocol}//${host}/api/sync?room=${roomCode}`);
+    // We connect to /api/sync
+    const socket = new WebSocket(`${protocol}//${host}/api/sync`);
     socketRef.current = socket;
 
     socket.onopen = () => {
       console.log('Sync Engine: Connected to WebSocket');
       setIsConnected(true);
+
+      // 1. Send JOIN message immediately upon connection
+      socket.send(JSON.stringify({
+        type: 'JOIN',
+        roomCode
+      }));
     };
 
     socket.onmessage = (event) => {
       try {
         const data: SyncMessage = JSON.parse(event.data);
         
-        if (data.type === 'SYNC' && data.sender !== displayName) {
-          if (data.action && data.time !== undefined) {
-            onSyncReceived(data.action, data.time, data.timestamp);
-          }
-        } else if (data.type === 'CHAT') {
-          setMessages((prev) => [...prev, data]);
+        if (data.type === 'SYNC_VIDEO') {
+          // payload contains { playing, currentTime }
+          onSyncReceived(data.payload);
+        } else if (data.type === 'CHAT_MESSAGE') {
+          setMessages((prev) => [...prev, data.payload]);
         }
       } catch (err) {
         console.error('Sync Engine: Failed to parse message', err);
@@ -58,34 +67,35 @@ export function useRoomSync({ roomCode, displayName, onSyncReceived }: UseRoomSy
     return () => {
       socket.close();
     };
-  }, [roomCode, displayName, onSyncReceived]);
+  }, [roomCode, onSyncReceived]);
 
-  const sendSyncAction = useCallback((action: 'PLAY' | 'PAUSE' | 'SEEK', time: number) => {
+  const sendSyncAction = useCallback((playing: boolean, currentTime: number) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      const payload: SyncMessage = {
-        type: 'SYNC',
-        action,
-        time,
-        sender: displayName,
-        timestamp: Date.now(),
+      const message: SyncMessage = {
+        type: 'SYNC_VIDEO',
+        roomCode,
+        payload: {
+          playing,
+          currentTime
+        }
       };
-      socketRef.current.send(JSON.stringify(payload));
+      socketRef.current.send(JSON.stringify(message));
     }
-  }, [displayName]);
+  }, [roomCode]);
 
   const sendChatMessage = useCallback((text: string) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      const payload: SyncMessage = {
-        type: 'CHAT',
-        text,
-        sender: displayName,
-        timestamp: Date.now(),
+      const message: SyncMessage = {
+        type: 'CHAT_MESSAGE',
+        roomCode,
+        payload: {
+          sender: displayName,
+          text
+        }
       };
-      socketRef.current.send(JSON.stringify(payload));
-      // Optimistically add own message
-      setMessages((prev) => [...prev, payload]);
+      socketRef.current.send(JSON.stringify(message));
     }
-  }, [displayName]);
+  }, [roomCode, displayName]);
 
   return { isConnected, sendSyncAction, sendChatMessage, messages };
 }
