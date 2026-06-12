@@ -134,22 +134,22 @@ export default function RoomPage() {
   return (
     <div className="flex flex-col h-screen bg-black text-white font-sans selection:bg-blue-500/30">
       {/* Cinematic Header */}
-      <header className="flex items-center justify-between px-10 py-6 border-b border-white/5 bg-zinc-900/20 backdrop-blur-3xl z-50">
-        <div className="flex items-center gap-8">
-          <button onClick={() => router.push('/')} className="text-3xl font-black tracking-[0.05em] text-blue-500 italic hover:scale-105 transition-transform active:scale-95 pr-4 inline-block font-[family-name:var(--font-bebas)]">
+      <header className="flex flex-col md:flex-row gap-4 items-center justify-between px-6 md:px-10 py-4 md:py-6 border-b border-white/5 bg-zinc-900/20 backdrop-blur-3xl z-50">
+        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-center sm:text-left">
+          <button onClick={() => router.push('/')} className="text-2xl md:text-3xl font-black tracking-[0.05em] text-blue-500 italic hover:scale-105 transition-transform active:scale-95 sm:pr-4 inline-block font-[family-name:var(--font-bebas)]">
             CINESPACE
           </button>
-          <div className="h-10 w-px bg-white/10" />
+          <div className="hidden sm:block h-10 w-px bg-white/10" />
           <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-            <h2 className="text-white font-black text-xl leading-none mb-2 tracking-tight">{roomData.title}</h2>
-            <div className="flex items-center gap-3">
+            <h2 className="text-white font-black text-lg md:text-xl leading-none mb-2 tracking-tight">{roomData.title}</h2>
+            <div className="flex items-center justify-center sm:justify-start gap-3">
               <span className="text-zinc-500 font-mono text-[9px] uppercase tracking-[0.3em] font-black">Theater ID</span>
               <span className="text-blue-500 font-mono text-[10px] font-black tracking-widest bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">{roomCode}</span>
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-8">
+        <div className="flex flex-wrap items-center justify-center gap-3 md:gap-8">
           {/* Home Button */}
           <button
             onClick={() => router.push('/')}
@@ -184,12 +184,12 @@ export default function RoomPage() {
       </header>
 
       {/* Main Theater View */}
-      <main className="flex flex-1 overflow-hidden relative">
+      <main className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden relative no-scrollbar">
         {/* Ambient Light Effect */}
         <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[150px] pointer-events-none" />
 
         {/* Left Side: Cinematic Player Area */}
-        <div className="flex-1 flex flex-col items-center justify-center relative p-12 overflow-y-auto no-scrollbar">
+        <div className="w-full lg:flex-1 flex flex-col items-center justify-start relative p-4 md:p-6 lg:py-6 lg:px-12 overflow-y-auto lg:overflow-y-auto no-scrollbar">
           <div className="w-full max-w-6xl animate-in fade-in zoom-in duration-700">
             <div className="rounded-[40px] overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] border border-white/5 bg-zinc-950 ring-1 ring-white/10">
               <VideoPlayer 
@@ -202,20 +202,20 @@ export default function RoomPage() {
             </div>
 
             {/* Controls & Metadata Panel */}
-            <div className="mt-12 flex items-center justify-between glass p-8 rounded-[32px] shadow-2xl">
-              <div className="flex items-center gap-10">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] mb-3">Playback Source</span>
-                  <div className="flex items-center gap-4">
+            <div className="mt-6 md:mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0 glass p-5 sm:p-6 rounded-[24px] shadow-2xl">
+              <div className="flex items-center gap-10 w-full sm:w-auto">
+                <div className="flex flex-col w-full sm:w-auto">
+                  <span className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] mb-3 text-center sm:text-left">Playback Source</span>
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
                     <div className="bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(37,99,235,0.2)]">
                       {roomData.videoType}
                     </div>
-                    <span className="truncate max-w-sm text-sm text-zinc-400 font-medium tracking-tight italic opacity-60">{roomData.videoUrl}</span>
+                    <span className="truncate max-w-xs sm:max-w-sm text-sm text-zinc-400 font-medium tracking-tight italic opacity-60 text-center sm:text-left">{roomData.videoUrl}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 w-full sm:w-auto justify-center sm:justify-end">
                 <button 
                   onClick={copyLink}
                   className={`relative overflow-hidden group px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center gap-3 ${
@@ -240,7 +240,7 @@ export default function RoomPage() {
         </div>
 
         {/* Right Side: Enhanced Chat Sidebar */}
-        <aside className="w-[450px] border-l border-white/5 bg-zinc-900/10 backdrop-blur-3xl flex flex-col shadow-[-40px_0_80px_rgba(0,0,0,0.5)] z-40">
+        <aside className="w-full lg:w-[450px] h-[550px] lg:h-auto border-t lg:border-t-0 lg:border-l border-white/5 bg-zinc-900/10 backdrop-blur-3xl flex flex-col shadow-[0_-20px_50px_rgba(0,0,0,0.3)] lg:shadow-[-40px_0_80px_rgba(0,0,0,0.5)] z-40">
           <ChatBox 
             messages={messages} 
             onSendMessage={sendChatMessage} 

@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { WebSocketServer } from 'ws';
+import { supabaseAdmin } from './src/backend/config/supabase.js';
 
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -14,8 +15,8 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Room Cache (In-memory replacement for Redis)
-const rooms = new Map();
-const roomHosts = new Map();
+const rooms = new Map<string, any>();
+const roomHosts = new Map<string, string>();
 
 // Helper to retrieve currently connected users in a room
 const getRoomUsers = (roomCode: string, wss: any) => {
@@ -243,6 +244,72 @@ app.prepare().then(() => {
             }));
           }
         });
+
+        // Check if room is now empty
+        let activeClients = 0;
+        wss.clients.forEach((client: any) => {
+          if (
+            client !== ws &&
+            client.readyState === 1 &&
+            client.roomCode === ws.roomCode
+          ) {
+            activeClients++;
+          }
+        });
+
+        if (activeClients === 0) {
+          const roomCode = ws.roomCode;
+          console.log(`Performing immediate cleanup for empty room: ${roomCode}`);
+          roomHosts.delete(roomCode);
+          rooms.delete(roomCode);
+
+          (async () => {
+            try {
+              // Fetch room data to get video URL
+              const { data: roomData } = await supabaseAdmin
+                .from('rooms')
+                .select('*')
+                .eq('room_code', roomCode)
+                .single();
+
+              if (roomData) {
+                // If it's a file upload, delete from Supabase storage
+                if (roomData.video_type === 'FILE' && roomData.video_url) {
+                  const bucketName = process.env.NEXT_PUBLIC_SUPABASE_BUCKET || 'Local-videos';
+                  const bucketPrefix = `/storage/v1/object/public/${bucketName}/`;
+                  const bucketIndex = roomData.video_url.indexOf(bucketPrefix);
+                  let storageFilePath = '';
+                  if (bucketIndex !== -1) {
+                    storageFilePath = roomData.video_url.substring(bucketIndex + bucketPrefix.length);
+                  } else {
+                    const urlParts = roomData.video_url.split('/');
+                    storageFilePath = urlParts[urlParts.length - 1];
+                  }
+                  console.log(`Deleting file from Supabase storage: ${storageFilePath}`);
+                  const { error: storageError } = await supabaseAdmin
+                    .storage
+                    .from(bucketName)
+                    .remove([storageFilePath]);
+                  if (storageError) {
+                    console.error(`Error deleting file from Supabase storage:`, storageError);
+                  }
+                }
+
+                // Delete room from database
+                console.log(`Deleting room ${roomCode} from database`);
+                const { error: dbError } = await supabaseAdmin
+                  .from('rooms')
+                  .delete()
+                  .eq('room_code', roomCode);
+                if (dbError) {
+                  console.error(`Error deleting room from DB:`, dbError);
+                }
+              }
+            } catch (err) {
+              console.error(`Cleanup error for room ${roomCode}:`, err);
+            }
+          })();
+        }
       }
     });
   });

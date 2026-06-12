@@ -161,7 +161,7 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
   }, [playing, currentTime, isReady, type]);
 
   // --- 4. Controls (Skip/Seek) ---
-  const skip = (seconds: number) => {
+  const skip = useCallback((seconds: number) => {
     let newTime = 0;
     if (type === 'file' && videoRef.current) {
       newTime = Math.max(0, videoRef.current.currentTime + seconds);
@@ -172,7 +172,46 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
       ytPlayerRef.current.seekTo(newTime, true);
       onAction(playing, newTime);
     }
-  };
+  }, [playing, type, onAction]);
+
+  // --- 5. Spacebar & Arrow Keys listener ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl && (
+          activeEl.tagName === 'INPUT' || 
+          activeEl.tagName === 'TEXTAREA' || 
+          (activeEl as any).isContentEditable
+        )
+      ) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        const newPlaying = !playing;
+        let time = 0;
+        if (type === 'file' && videoRef.current) {
+          time = videoRef.current.currentTime || 0;
+        } else if (type === 'youtube' && ytPlayerRef.current && ytPlayerRef.current.getCurrentTime) {
+          time = ytPlayerRef.current.getCurrentTime() || 0;
+        }
+        onAction(newPlaying, time);
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        skip(-10);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        skip(10);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [playing, type, onAction, skip]);
 
   return (
     <div className="w-full aspect-video bg-black rounded-[32px] overflow-hidden shadow-2xl relative border border-white/5 group">
