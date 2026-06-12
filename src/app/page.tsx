@@ -97,7 +97,7 @@ export default function Home() {
           <div className="inline-block px-4 py-1.5 mb-6 rounded-full border border-blue-500/20 bg-blue-500/5 text-blue-500 text-[10px] font-black uppercase tracking-[0.3em] shadow-[0_0_20px_rgba(59,130,246,0.1)]">
             Cinespace • Watch Together
           </div>
-          <h1 className="text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 mb-4 italic leading-tight">
+          <h1 className="text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-500 mb-4 italic leading-tight pr-6 inline-block">
             CINESPACE
           </h1>
           <p className="text-zinc-400 text-xl font-medium max-w-md mx-auto leading-relaxed">
@@ -139,7 +139,7 @@ export default function Home() {
 
         {step === 'create' && (
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <button onClick={() => setStep('initial')} className="mb-8 text-zinc-500 hover:text-white flex items-center gap-2 transition-colors font-bold uppercase tracking-widest text-[10px]">
+            <button onClick={() => setStep('initial')} className="mb-8 text-zinc-500 hover:text-white flex items-center gap-2.5 transition-colors font-bold uppercase tracking-widest text-xs">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
               Back to Home
             </button>
@@ -197,8 +197,11 @@ export default function Home() {
 
         {step === 'join' && (
           <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <button onClick={() => setStep('initial')} className="mb-8 text-zinc-500 hover:text-white flex items-center gap-2 transition-colors font-bold uppercase tracking-widest text-[10px]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+            <button 
+              onClick={() => setStep('initial')} 
+              className="mb-10 text-zinc-400 hover:text-white flex items-center gap-3 transition-all font-black uppercase tracking-[0.2em] text-[12px] bg-white/5 hover:bg-white/10 px-6 py-3 rounded-2xl border border-white/5 hover:border-white/10 shadow-lg active:scale-95"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
               Go Back
             </button>
             <div className="glass p-10 rounded-[40px] shadow-2xl relative overflow-hidden">

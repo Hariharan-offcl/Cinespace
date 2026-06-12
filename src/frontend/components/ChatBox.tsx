@@ -12,24 +12,76 @@ interface ChatBoxProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
   currentUserName: string;
+  typingUsers?: string[];
+  onTypingStatusChange?: (isTyping: boolean) => void;
 }
 
-export default function ChatBox({ messages, onSendMessage, currentUserName }: ChatBoxProps) {
+export default function ChatBox({ messages, onSendMessage, currentUserName, typingUsers = [], onTypingStatusChange }: ChatBoxProps) {
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isCurrentlyTyping, setIsCurrentlyTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or when typing status updates
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, typingUsers]);
+
+  // Clean up typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputText(value);
+
+    if (onTypingStatusChange) {
+      if (value === '') {
+        // If input is cleared, stop typing immediately
+        setIsCurrentlyTyping(false);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        onTypingStatusChange(false);
+      } else {
+        if (!isCurrentlyTyping) {
+          setIsCurrentlyTyping(true);
+          onTypingStatusChange(true);
+        }
+
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsCurrentlyTyping(false);
+          onTypingStatusChange(false);
+        }, 2000);
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputText.trim()) {
       onSendMessage(inputText);
       setInputText('');
+      if (isCurrentlyTyping) {
+        setIsCurrentlyTyping(false);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        if (onTypingStatusChange) {
+          onTypingStatusChange(false);
+        }
+      }
     }
   };
 
@@ -49,7 +101,7 @@ export default function ChatBox({ messages, onSendMessage, currentUserName }: Ch
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent"
       >
-        {messages.length === 0 ? (
+        {messages.length === 0 && typingUsers.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-30 text-center px-4">
             <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -58,6 +110,15 @@ export default function ChatBox({ messages, onSendMessage, currentUserName }: Ch
           </div>
         ) : (
           messages.map((msg, idx) => {
+            if (msg.sender === 'system') {
+              return (
+                <div key={idx} className="flex justify-center my-2 animate-in fade-in zoom-in-95 duration-300">
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-zinc-500 bg-zinc-850/50 px-4 py-1.5 rounded-xl border border-zinc-800/60 shadow-sm">
+                    {msg.text}
+                  </span>
+                </div>
+              );
+            }
             const isMe = msg.sender === currentUserName;
             return (
               <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
@@ -80,6 +141,20 @@ export default function ChatBox({ messages, onSendMessage, currentUserName }: Ch
             );
           })
         )}
+
+        {/* Typing Indicator */}
+        {typingUsers.length > 0 && (
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs italic animate-in fade-in duration-300 mt-2 px-1">
+            <div className="flex items-center gap-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span className="ml-1 font-semibold text-zinc-400">
+              {typingUsers.join(', ')} typing..
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Input Area */}
@@ -88,7 +163,7 @@ export default function ChatBox({ messages, onSendMessage, currentUserName }: Ch
           <input 
             type="text" 
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleInputChange}
             placeholder="Type your message..."
             className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-zinc-800 transition-all placeholder:text-zinc-600 pr-12"
           />

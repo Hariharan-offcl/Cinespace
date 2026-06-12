@@ -72,10 +72,33 @@ export default function RoomPage() {
     setCurrentTime(state.currentTime);
   }, []);
 
-  const { isConnected, sendSyncAction, sendChatMessage, messages } = useRoomSync({
+  // Toast notifications state
+  const [toasts, setToasts] = useState<Array<{ id: string; text: string; type: 'join' | 'leave' }>>([]);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+
+  const showToast = useCallback((text: string, type: 'join' | 'leave') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, text, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const handleUserJoined = useCallback((name: string) => {
+    showToast(`${name} joined`, 'join');
+  }, [showToast]);
+
+  const handleUserLeft = useCallback((name: string) => {
+    showToast(`${name} left`, 'leave');
+  }, [showToast]);
+
+  const { isConnected, sendSyncAction, sendChatMessage, messages, typingUsers, sendTypingStatus, roomUsers } = useRoomSync({
     roomCode,
     displayName: displayName || 'Anonymous',
+    enabled: isVerified,
     onSyncReceived: handleSyncReceived,
+    onUserJoined: handleUserJoined,
+    onUserLeft: handleUserLeft,
   });
 
   const handleVerified = (name: string) => {
@@ -113,7 +136,7 @@ export default function RoomPage() {
       {/* Cinematic Header */}
       <header className="flex items-center justify-between px-10 py-6 border-b border-white/5 bg-zinc-900/20 backdrop-blur-3xl z-50">
         <div className="flex items-center gap-8">
-          <button onClick={() => router.push('/')} className="text-2xl font-black tracking-tighter text-blue-500 italic hover:scale-105 transition-transform active:scale-95">
+          <button onClick={() => router.push('/')} className="text-3xl font-black tracking-[0.05em] text-blue-500 italic hover:scale-105 transition-transform active:scale-95 pr-4 inline-block font-[family-name:var(--font-bebas)]">
             CINESPACE
           </button>
           <div className="h-10 w-px bg-white/10" />
@@ -127,6 +150,28 @@ export default function RoomPage() {
         </div>
         
         <div className="flex items-center gap-8">
+          {/* Home Button */}
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl border bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white transition-colors active:scale-95 cursor-pointer"
+          >
+            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Home</span>
+          </button>
+
+          {/* Members Button */}
+          <button
+            onClick={() => setShowMembersModal(true)}
+            className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl border bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 transition-colors active:scale-95 cursor-pointer relative"
+          >
+            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Members ({roomUsers.length})</span>
+          </button>
+
           <div className={`flex items-center gap-2.5 px-5 py-2 rounded-2xl border ${isConnected ? 'bg-green-500/5 border-green-500/20 text-green-500' : 'bg-red-500/5 border-red-500/20 text-red-500'} transition-colors`}>
             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-red-500'}`} />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">{isConnected ? 'Sync Online' : 'Sync Error'}</span>
@@ -200,9 +245,86 @@ export default function RoomPage() {
             messages={messages} 
             onSendMessage={sendChatMessage} 
             currentUserName={displayName || 'Anonymous'} 
+            typingUsers={typingUsers}
+            onTypingStatusChange={sendTypingStatus}
           />
         </aside>
       </main>
+
+      {/* Floating Toast Notification Container */}
+      <div className="fixed bottom-6 left-6 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-xl shadow-2xl animate-slide-in pointer-events-auto ${
+              toast.type === 'join'
+                ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_10px_30px_-10px_rgba(34,197,94,0.3)]'
+                : 'bg-red-500/10 border-red-500/20 text-red-400 shadow-[0_10px_30px_-10px_rgba(239,68,68,0.3)]'
+            }`}
+          >
+            <div className={`w-2 h-2 rounded-full ${toast.type === 'join' ? 'bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.5)]' : 'bg-red-400 animate-pulse shadow-[0_0_8px_rgba(248,113,113,0.5)]'}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{toast.text}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Members List Modal */}
+      {showMembersModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-md glass rounded-[32px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 relative animate-in zoom-in-95 duration-300">
+            {/* Close Button */}
+            <button 
+              onClick={() => setShowMembersModal(false)}
+              className="absolute top-6 right-6 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="mb-6">
+              <h3 className="text-lg font-black uppercase tracking-[0.05em] text-white flex items-center gap-3">
+                <svg className="w-6 h-6 text-blue-500 animate-pulse-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Room Members
+              </h3>
+              <p className="text-zinc-500 text-[9px] uppercase tracking-widest font-black mt-2">
+                Active connections in this session
+              </p>
+            </div>
+
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+              {roomUsers.map((user, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-all group"
+                >
+                  <div className="flex items-center gap-3.5">
+                    {/* User Avatar Circle */}
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs uppercase tracking-wider ${
+                      user.isHost 
+                        ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' 
+                        : 'bg-zinc-800 text-zinc-300'
+                    }`}>
+                      {user.displayName.slice(0, 2)}
+                    </div>
+                    <span className="text-xs font-black text-zinc-200 uppercase tracking-wider">
+                      {user.displayName} {user.displayName === displayName && <span className="text-[9px] text-zinc-500 lowercase font-medium"> (you)</span>}
+                    </span>
+                  </div>
+                  
+                  {user.isHost && (
+                    <span className="bg-blue-600/10 text-blue-500 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border border-blue-500/20 shadow-[0_0_15px_rgba(37,99,235,0.1)]">
+                      Host
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

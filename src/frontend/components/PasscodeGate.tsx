@@ -115,7 +115,7 @@ export default function PasscodeGate({ roomCode, onVerified }: PasscodeGateProps
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (displayName.trim()) {
-      localStorage.setItem(`cinespace_name_${roomCode}`, displayName.trim());
+      sessionStorage.setItem(`cinespace_name_${roomCode}`, displayName.trim());
       onVerified(displayName.trim());
     } else {
       setError('Please enter a display name.');
@@ -139,7 +139,7 @@ export default function PasscodeGate({ roomCode, onVerified }: PasscodeGateProps
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 text-white p-4">
       <div className="w-full max-w-md bg-zinc-900/50 backdrop-blur-xl rounded-3xl p-10 shadow-2xl border border-zinc-800">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-400 mb-2 italic tracking-tighter">CINESPACE</h1>
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-400 mb-2 italic tracking-[0.05em] pr-4 inline-block font-[family-name:var(--font-bebas)]">CINESPACE</h1>
           <p className="text-zinc-500 text-sm font-medium">Entering Room: <span className="text-blue-500 font-mono font-bold tracking-wider">{roomCode}</span></p>
         </div>
         

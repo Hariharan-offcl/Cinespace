@@ -53,6 +53,13 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
     const createPlayer = () => {
       if (!isMounted || !document.getElementById('yt-player-target')) return;
 
+      // Clear existing player if any
+      if (ytPlayerRef.current && ytPlayerRef.current.destroy) {
+        try {
+          ytPlayerRef.current.destroy();
+        } catch (e) {}
+      }
+
       player = new window.YT.Player('yt-player-target', {
         height: '100%',
         width: '100%',
@@ -62,8 +69,9 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
           controls: 1,
           modestbranding: 1,
           rel: 0,
-          origin: window.location.origin,
-          enablejsapi: 1
+          origin: typeof window !== 'undefined' ? window.location.origin : '',
+          enablejsapi: 1,
+          widget_referrer: typeof window !== 'undefined' ? window.location.origin : ''
         },
         events: {
           onReady: () => {
@@ -93,15 +101,31 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
         const tag = document.createElement('script');
         tag.id = 'youtube-sdk';
         tag.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(tag);
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        if (firstScriptTag && firstScriptTag.parentNode) {
+          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        } else {
+          document.body.appendChild(tag);
+        }
       }
-      window.onYouTubeIframeAPIReady = createPlayer;
+      
+      // Use a more robust way to wait for the API
+      const checkYT = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+          createPlayer();
+          clearInterval(checkYT);
+        }
+      }, 100);
+      
+      return () => clearInterval(checkYT);
     }
 
     return () => {
       isMounted = false;
       if (ytPlayerRef.current && ytPlayerRef.current.destroy) {
-        ytPlayerRef.current.destroy();
+        try {
+          ytPlayerRef.current.destroy();
+        } catch (e) {}
       }
     };
   }, [videoId, type]);
@@ -120,14 +144,18 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
       const drift = Math.abs(videoRef.current.currentTime - currentTime);
       if (drift > 1.5) videoRef.current.currentTime = currentTime;
 
-    } else if (type === 'youtube' && ytPlayerRef.current) {
-      const state = ytPlayerRef.current.getPlayerState();
-      if (playing && state !== 1) ytPlayerRef.current.playVideo();
-      else if (!playing && state !== 2) ytPlayerRef.current.pauseVideo();
+    } else if (type === 'youtube' && ytPlayerRef.current && ytPlayerRef.current.playVideo) {
+      try {
+        const state = ytPlayerRef.current.getPlayerState();
+        if (playing && state !== 1) ytPlayerRef.current.playVideo();
+        else if (!playing && state !== 2) ytPlayerRef.current.pauseVideo();
 
-      const localTime = ytPlayerRef.current.getCurrentTime();
-      if (Math.abs(localTime - currentTime) > 2.0) {
-        ytPlayerRef.current.seekTo(currentTime, true);
+        const localTime = ytPlayerRef.current.getCurrentTime();
+        if (Math.abs(localTime - currentTime) > 2.0) {
+          ytPlayerRef.current.seekTo(currentTime, true);
+        }
+      } catch (e) {
+        console.warn('YT Player not fully interactive yet');
       }
     }
   }, [playing, currentTime, isReady, type]);
@@ -139,7 +167,7 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
       newTime = Math.max(0, videoRef.current.currentTime + seconds);
       videoRef.current.currentTime = newTime;
       onAction(playing, newTime);
-    } else if (type === 'youtube' && ytPlayerRef.current) {
+    } else if (type === 'youtube' && ytPlayerRef.current && ytPlayerRef.current.getCurrentTime) {
       newTime = Math.max(0, ytPlayerRef.current.getCurrentTime() + seconds);
       ytPlayerRef.current.seekTo(newTime, true);
       onAction(playing, newTime);
@@ -166,7 +194,7 @@ export default function VideoPlayer({ url, type, playing, currentTime, onAction 
         />
       ) : (
         <div className="w-full h-full">
-          <div id="yt-player-target" key={videoId} className="w-full h-full" />
+          <div id="yt-player-target" className="w-full h-full" />
         </div>
       )}
 
