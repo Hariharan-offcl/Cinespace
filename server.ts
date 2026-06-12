@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
@@ -16,8 +17,11 @@ const rooms = new Map();
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url!, true);
-    handle(req, res, parsedUrl);
+    const parsedUrl = new URL(req.url!, `http://${hostname}:${port}`);
+    handle(req, res, {
+      pathname: parsedUrl.pathname,
+      query: Object.fromEntries(parsedUrl.searchParams)
+    } as any);
   });
 
   // Initialize WebSocket Server
@@ -25,15 +29,18 @@ app.prepare().then(() => {
 
   // Handle "Upgrade" requests (HTTP -> WebSocket)
   server.on('upgrade', (request, socket, head) => {
-    const { pathname } = parse(request.url!, true);
+    const parsedUrl = new URL(request.url!, `http://${hostname}:${port}`);
 
-    if (pathname === '/api/sync') {
+    if (parsedUrl.pathname === '/api/sync') {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
-    } else {
+    } else if (!parsedUrl.pathname.startsWith('/_next')) {
+      // Only destroy the socket if it's not our API AND not Next.js internal
       socket.destroy();
     }
+    // If it's a /_next/ path, we don't call socket.destroy(),
+    // allowing Next.js's own listeners to handle the HMR handshake.
   });
 
   // WebSocket Connection Logic

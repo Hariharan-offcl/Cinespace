@@ -1,99 +1,121 @@
-import Room from '../models/Room';
+import { supabaseAdmin } from '../config/supabase';
 
 // Helper function to generate a unique 6-character room code
 const generateRoomCode = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
-// A local memory dictionary to track bad login attempts per user
-// Note: In production, this would reset if the server restarts.
 const failedAttemptsTracker: Record<string, { count: number; lockoutUntil: number }> = {};
 
 export const resolvers = {
   Query: {
     getRoom: async (_: any, { roomCode }: { roomCode: string }) => {
       try {
-        return await Room.findOne({ roomCode });
+        const { data, error } = await supabaseAdmin
+          .from('rooms')
+          .select('*')
+          .eq('room_code', roomCode)
+          .single();
+
+        if (error) return null;
+        
+        // Map snake_case from Postgres to camelCase for GraphQL
+        return {
+          ...data,
+          roomCode: data.room_code,
+          videoUrl: data.video_url,
+          videoType: data.video_type,
+          currentTime: data.current_time,
+          createdAt: data.created_at
+        };
       } catch (error) {
         throw new Error('Error fetching room');
       }
     },
   },
   Mutation: {
-    createRoom: async (_: any, { videoUrl, passcode }: { videoUrl: string; passcode?: string }) => {
+    createRoom: async (_: any, { title, videoUrl, passcode }: { title: string; videoUrl: string; passcode?: string }) => {
       try {
         let roomCode = generateRoomCode();
         
-        // Ensure roomCode is unique
-        let existingRoom = await Room.findOne({ roomCode });
-        while (existingRoom) {
-          roomCode = generateRoomCode();
-          existingRoom = await Room.findOne({ roomCode });
-        }
-
         // Simple Detection: Check if URL is from YouTube
         const isYouTube = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
         const videoType = isYouTube ? 'YOUTUBE' : 'FILE';
 
-        const newRoom = new Room({
-          roomCode,
-          videoUrl,
-          videoType,
-          passcode,
-          playing: false,
-          currentTime: 0,
-        });
+        const { data, error } = await supabaseAdmin
+          .from('rooms')
+          .insert([
+            {
+              title,
+              room_code: roomCode,
+              video_url: videoUrl,
+              video_type: videoType,
+              passcode,
+              playing: false,
+              playback_time: 0,
+            }
+          ])
+          .select()
+          .single();
 
-        await newRoom.save();
-        return newRoom;
+        if (error) throw error;
+
+        return {
+          ...data,
+          roomCode: data.room_code,
+          videoUrl: data.video_url,
+          videoType: data.video_type,
+          currentTime: data.playback_time,
+          createdAt: data.created_at
+        };
       } catch (error) {
+        console.error('Create Room Error:', error);
         throw new Error('Error creating room');
       }
     },
     joinRoom: async (_: any, { roomCode, passcode }: { roomCode: string; passcode?: string }, context: any) => {
-      // Use userIp from context or fallback to a generic identifier
       const userKey = context.userIp || "anonymous_user"; 
       const now = Date.now();
 
-      // 1. Check if the user is currently locked out
       if (failedAttemptsTracker[userKey] && failedAttemptsTracker[userKey].lockoutUntil > now) {
         const remainingTime = Math.ceil((failedAttemptsTracker[userKey].lockoutUntil - now) / 1000);
-        throw new Error(`Too many incorrect attempts. You are locked out. Try again in ${remainingTime} seconds.`);
+        throw new Error(`Too many incorrect attempts. Locked out for ${remainingTime}s.`);
       }
 
       try {
-        const room = await Room.findOne({ roomCode });
-        if (!room) {
-          throw new Error('Room not found');
-        }
+        const { data: room, error } = await supabaseAdmin
+          .from('rooms')
+          .select('*')
+          .eq('room_code', roomCode)
+          .single();
 
-        // 2. If the room has a passcode, verify it
-        if (room.passcode) {
-          if (room.passcode !== passcode) {
-            // Initialize or increment failed attempts count
-            if (!failedAttemptsTracker[userKey]) {
-              failedAttemptsTracker[userKey] = { count: 1, lockoutUntil: 0 };
-            } else {
-              failedAttemptsTracker[userKey].count += 1;
-            }
+        if (error || !room) throw new Error('Room not found');
 
-            // If they fail 5 times in a row, lock them out for 60 seconds
-            if (failedAttemptsTracker[userKey].count >= 5) {
-              failedAttemptsTracker[userKey].lockoutUntil = now + 60000; // 60,000 ms = 1 minute
-              failedAttemptsTracker[userKey].count = 0; // Reset counter for after the lockout expires
-              throw new Error('Too many incorrect attempts. You are locked out for 1 minute.');
-            }
-
-            throw new Error('Invalid passcode');
+        if (room.passcode && room.passcode !== passcode) {
+          if (!failedAttemptsTracker[userKey]) {
+            failedAttemptsTracker[userKey] = { count: 1, lockoutUntil: 0 };
+          } else {
+            failedAttemptsTracker[userKey].count += 1;
           }
+
+          if (failedAttemptsTracker[userKey].count >= 5) {
+            failedAttemptsTracker[userKey].lockoutUntil = now + 60000;
+            failedAttemptsTracker[userKey].count = 0;
+            throw new Error('Too many incorrect attempts. Locked out for 1 minute.');
+          }
+          throw new Error('Invalid passcode');
         }
 
-        // 3. Success! Clear their failed history
-        if (failedAttemptsTracker[userKey]) {
-          delete failedAttemptsTracker[userKey];
-        }
+        if (failedAttemptsTracker[userKey]) delete failedAttemptsTracker[userKey];
 
-        return room;
+        return {
+          ...room,
+          roomCode: room.room_code,
+          videoUrl: room.video_url,
+          videoType: room.video_type,
+          currentTime: room.playback_time,
+          createdAt: room.created_at
+        };
       } catch (error) {
         throw new Error(error instanceof Error ? error.message : 'Error joining room');
       }

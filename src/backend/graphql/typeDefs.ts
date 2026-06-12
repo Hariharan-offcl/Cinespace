@@ -3,6 +3,7 @@ import { gql } from 'graphql-tag';
 export const typeDefs = gql`
   type Room {
     id: ID!
+    title: String!
     roomCode: String!
     videoUrl: String!
     videoType: String!
@@ -16,7 +17,7 @@ export const typeDefs = gql`
   }
 
   type Mutation {
-    createRoom(videoUrl: String!, passcode: String): Room!
+    createRoom(title: String!, videoUrl: String!, passcode: String): Room!
     joinRoom(roomCode: String!, passcode: String): Room
   }
 `;
