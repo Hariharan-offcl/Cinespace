@@ -5,8 +5,8 @@ import next from 'next';
 import { WebSocketServer } from 'ws';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
-const port = 3000;
+const hostname = '0.0.0.0'; // Bind to all interfaces for production
+const port = parseInt(process.env.PORT || '3000', 10);
 
 // Initialize Next.js
 const app = next({ dev, hostname, port });
