@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "ts-node server.ts",
-    "build": "next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=450' next build && tsc server.ts --esModuleInterop --module ESNext --moduleResolution node --outDir dist",
     "start": "NODE_ENV=production node dist/server.js",
     "lint": "eslint"
   },
